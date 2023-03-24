@@ -1,1 +1,1 @@
-License: Unlicense
+shows how a parachain might use the tellor pallet within their runtime
