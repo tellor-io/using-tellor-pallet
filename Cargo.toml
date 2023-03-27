@@ -1,5 +1,5 @@
 [package]
-name = "tellor-sample"
+name = "using-tellor"
 version = "0.1.0"
 description = "Sample pallet using Tellor."
 homepage = "https://tellor.io"
@@ -17,7 +17,7 @@ frame-benchmarking = { version = "4.0.0-dev", default-features = false, optional
 frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
 frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
 sp-arithmetic = { version = "6.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
-tellor = { version = "0.1.0", default-features = false, git = "https://github.com/evilrobot-01/substrate-pallets", branch = "tellor" }
+tellor = { version = "0.1.0", default-features = false, git = "https://github.com/tellor-io/tellor-pallet" }
 
 [features]
 default = ["std"]
