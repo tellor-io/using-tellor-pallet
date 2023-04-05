@@ -4,10 +4,10 @@ pub use pallet::*;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-    use frame_support::{pallet_prelude::*, sp_runtime::Saturating, traits::Time};
+    use frame_support::{pallet_prelude::*, sp_runtime::Saturating};
     use frame_system::pallet_prelude::*;
     use sp_arithmetic::traits::AtLeast32BitUnsigned;
-    use tellor::traits::UsingTellor;
+    use tellor::{traits::UsingTellor, QueryId};
 
     #[pallet::pallet]
     #[pallet::generate_store(pub(super) trait Store)]
@@ -25,22 +25,8 @@ pub mod pallet {
         /// The type of price.
         type Price: AtLeast32BitUnsigned + MaybeSerializeDeserialize + Parameter + From<Self::Value>;
 
-        /// The type of query identifier.
-        type QueryId: Copy + MaybeSerializeDeserialize + Parameter;
-
         /// The UsingTellor trait helps pallets read data from Tellor.
-        type Tellor: UsingTellor<
-            Self::AccountId,
-            Self::Price,
-            Self::QueryId,
-            <Self::Time as Time>::Moment,
-        >;
-
-        /// The on-chain time provider.
-        type Time: Time<Moment = Self::Timestamp>;
-
-        /// The type of timestamp.
-        type Timestamp: AtLeast32BitUnsigned + Copy + From<u64>;
+        type Tellor: UsingTellor<Self::AccountId, Self::Price>;
 
         // The type of resulting value stored.
         type Value: AtLeast32BitUnsigned + Copy + Parameter + From<Self::Price>;
@@ -49,7 +35,7 @@ pub mod pallet {
     // The pallet's runtime storage items.
     #[pallet::storage]
     #[pallet::getter(fn config)]
-    pub type Configuration<T> = StorageValue<_, <T as Config>::QueryId>;
+    pub type Configuration<T> = StorageValue<_, QueryId>;
     #[pallet::storage]
     #[pallet::getter(fn values)]
     pub type Values<T> = StorageMap<
@@ -64,7 +50,7 @@ pub mod pallet {
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         /// The pallet was configured with a query identifier. [queryId]
-        Configured { query_id: T::QueryId },
+        Configured { query_id: QueryId },
         /// A value was stored. [value, who]
         ValueStored { value: T::Value, who: T::AccountId },
     }
@@ -81,7 +67,7 @@ pub mod pallet {
         /// A sample dispatchable that takes a query identifier as a parameter, writes it to
         /// storage and emits an event. This function must be dispatched by the configured origin.
         #[pallet::call_index(0)]
-        pub fn configure(origin: OriginFor<T>, query_id: T::QueryId) -> DispatchResult {
+        pub fn configure(origin: OriginFor<T>, query_id: QueryId) -> DispatchResult {
             // Only the configured origin can configure the pallet.
             T::ConfigureOrigin::ensure_origin(origin)?;
             // Store the query identifier
@@ -116,12 +102,12 @@ pub mod pallet {
         }
     }
 
-    const FIFTEEN_MINUTES: u64 = 15 * 60 * 1_000;
-    const ONE_DAY: u64 = 24 * 60 * 60 * 1_000;
+    const FIFTEEN_MINUTES: u64 = 15 * 60;
+    const ONE_DAY: u64 = 24 * 60 * 60;
 
     impl<T: Config> Pallet<T> {
-        fn get_price(query_id: T::QueryId) -> Option<T::Price> {
-            let timestamp = T::Time::now();
+        fn get_price(query_id: QueryId) -> Option<T::Price> {
+            let timestamp = T::Tellor::now();
 
             // Retrieve data at least 15 minutes old to allow time for disputes
             T::Tellor::get_data_before(query_id, timestamp.saturating_sub(FIFTEEN_MINUTES.into()))
