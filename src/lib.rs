@@ -4,10 +4,9 @@ pub use pallet::*;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-    use frame_support::{pallet_prelude::*, sp_runtime::Saturating};
+    use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
-    use sp_arithmetic::traits::AtLeast32BitUnsigned;
-    use tellor::{traits::UsingTellor, QueryId};
+    use tellor::{traits::UsingTellor, QueryId, HOURS, MINUTES, U256};
 
     #[pallet::pallet]
     #[pallet::generate_store(pub(super) trait Store)]
@@ -22,14 +21,8 @@ pub mod pallet {
         // The origin which may configure the pallet.
         type ConfigureOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
-        /// The type of price.
-        type Price: AtLeast32BitUnsigned + MaybeSerializeDeserialize + Parameter + From<Self::Value>;
-
         /// The UsingTellor trait helps pallets read data from Tellor.
-        type Tellor: UsingTellor<Self::AccountId, Self::Price>;
-
-        // The type of resulting value stored.
-        type Value: AtLeast32BitUnsigned + Copy + Parameter + From<Self::Price>;
+        type Tellor: UsingTellor<Self::AccountId>;
     }
 
     // The pallet's runtime storage items.
@@ -38,12 +31,8 @@ pub mod pallet {
     pub type Configuration<T> = StorageValue<_, QueryId>;
     #[pallet::storage]
     #[pallet::getter(fn values)]
-    pub type Values<T> = StorageMap<
-        _,
-        Blake2_128Concat,
-        <T as frame_system::Config>::AccountId,
-        <T as Config>::Value,
-    >;
+    pub type Values<T> =
+        StorageMap<_, Blake2_128Concat, <T as frame_system::Config>::AccountId, U256>;
 
     // Pallets use events to inform users when important changes are made.
     #[pallet::event]
@@ -52,7 +41,7 @@ pub mod pallet {
         /// The pallet was configured with a query identifier. [queryId]
         Configured { query_id: QueryId },
         /// A value was stored. [value, who]
-        ValueStored { value: T::Value, who: T::AccountId },
+        ValueStored { value: U256, who: T::AccountId },
     }
 
     // Errors inform users that something went wrong.
@@ -81,7 +70,7 @@ pub mod pallet {
         /// and then writes that derived value to storage and emits an event. This function must be
         /// dispatched by a signed extrinsic.
         #[pallet::call_index(1)]
-        pub fn do_something(origin: OriginFor<T>, value: T::Value) -> DispatchResult {
+        pub fn do_something(origin: OriginFor<T>, value: U256) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let who = ensure_signed(origin)?;
             // Get the query identifier, ensuring that the pallet has been configured
@@ -102,20 +91,19 @@ pub mod pallet {
         }
     }
 
-    const FIFTEEN_MINUTES: u64 = 15 * 60;
-    const ONE_DAY: u64 = 24 * 60 * 60;
+    const FIFTEEN_MINUTES: u64 = 15 * MINUTES;
+    const ONE_DAY: u64 = 24 * HOURS;
 
     impl<T: Config> Pallet<T> {
-        fn get_price(query_id: QueryId) -> Option<T::Price> {
+        fn get_price(query_id: QueryId) -> Option<U256> {
             let timestamp = T::Tellor::now();
-
             // Retrieve data at least 15 minutes old to allow time for disputes
             T::Tellor::get_data_before(query_id, timestamp.saturating_sub(FIFTEEN_MINUTES.into()))
                 .and_then(|(value, timestamp_retrieved)| {
                     // Check that the data is not too old
                     if timestamp.saturating_sub(timestamp_retrieved) < ONE_DAY.into() {
-                        // Use the helper function to parse the value to a price
-                        T::Tellor::value_to_price(value)
+                        // Use the helper function to parse the value to an unsigned integer
+                        T::Tellor::bytes_to_uint(value)
                     } else {
                         None
                     }
